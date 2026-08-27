@@ -16,43 +16,56 @@ ACTIVITIES = ['last-man-standing', 'pvp-arena', 'soul-wars-zeal', 'guardian-defe
 #Format a single achievement dictionary into a readable Discord message string.
 def format_achievement(ach):
     player = f"**{ach['player']['displayName']}**"
+    name = ach.get("name", "").strip()
     metric = ach.get("metric", "")
-    atype = ach.get("type", "").lower()
-    name = ach.get("name", "")
-    metric_clean = metric.replace("_", " ").replace("-", " ").title()
+    measure = ach.get("measure", "")
+    threshold = ach.get("threshold")
 
+    # Maxed account
     if name.lower() == "maxed overall":
         return f"{player} has maxed their account (2277 total level)!"
 
-    try:
-        value = name.replace(metric_clean, "").strip()
-    except Exception:
-        value = ""
+    # Base stats milestones
+    if name.lower().startswith("base ") and name.lower().endswith(" stats"):
+        return f"{player} has achieved {name.lower()}!"
 
-    if metric in SKILLS and atype == "level":
-        return f"{player} has achieved level {value} {metric_clean}!"
+    # Skill achievements
+    if metric in SKILLS and measure == "experience":
+        parts = name.split(" ", 1)
 
-    if metric in SKILLS and atype == "experience":
-        return f"{player} has achieved {value} {metric_clean} experience!"
+        if len(parts) == 2:
+            value, skill = parts
 
-    if metric == "overall":
-        return f"{player} has achieved {value} total XP!"
+            # Skill levels are represented by a plain number
+            # e.g. "99 Attack", "90 Defence", "70 Mining"
+            if value.isdigit():
+                return f"{player} has achieved level {value} {skill}!"
 
+            # XP milestones are represented with values such as
+            # "1m Attack", "10m Hitpoints", "50m Mining", etc.
+            return f"{player} has achieved {value} {skill} experience!"
+        
+    # Clue scroll achievements
     if metric in CLUES:
         clue_type = CLUES[metric]
-        return f"{player} has achieved {value} {clue_type} clue completions!"
+        value = name.split(" ", 1)[0]
+        return f"{player} has achieved {value} {clue_type} clue scroll completions!"
 
-    if metric in BOSSES:
-        return f"{player} has achieved {value} {metric_clean} kills!"
+    # Anything measured in kills already has the correct
+    # human-readable description in the API's "name" field.
+    if measure == "kills":
+        return f"{player} has achieved {name}!"
 
-    if metric in {'base_stats', 'combat_level'}:
-        return f"{player} has achieved base {value} stats!"
+    # Collection log milestones
+    if metric == "collections_logged":
+        return f"{player} has achieved {name}!"
 
-    if metric in ACTIVITIES:
-        return f"{player} has achieved {value} {metric_clean}!"
+    # Overall achievements
+    if metric == "overall":
+        return f"{player} has achieved {name}!"
 
-    #Fallback for unknown types
-    return f"{player} has achieved {value} {metric_clean}!"
+    # Fallback for anything new that WOM adds
+    return f"{player} has achieved {name}!"
 
 #Sends a batch of achievements to the set Discord webhook.
 def send_to_discord(achievements):
